@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hansen Global Forest Change: layer stack</title>
+  <style>
+    :root {
+      --page: #FFFFFF;
+      --text-primary: #1F1F1E;
+      --text-secondary: #5F5E5A;
+      --surface-1: #F4F3EE;
+      --border: rgba(0, 0, 0, 0.15);
+      --border-strong: rgba(0, 0, 0, 0.3);
+      --bg-accent: #E6F1FB;
+      --text-accent: #185FA5;
+      --radius: 8px;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    @media (prefers-color-scheme:dark) {
+      :root {
+        --page: #1A1A18;
+        --text-primary: #ECEBE6;
+        --text-secondary: #B4B2A9;
+        --surface-1: #2C2C2A;
+        --border: rgba(255, 255, 255, 0.18);
+        --border-strong: rgba(255, 255, 255, 0.35);
+        --bg-accent: #0C2F4F;
+        --text-accent: #85B7EB;
+      }
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      background: var(--page)
+    }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--text-primary);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5
+    }
+
+    .wrap {
+      max-width: 440px;
+      margin: 0 auto;
+      padding: 16px 16px 40px
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer
+    }
+
+    button:focus-visible {
+      outline: 2px solid var(--text-accent);
+      outline-offset: 2px
+    }
+
+    .ic {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex: none
+    }
+
+    .ic.fill {
+      fill: currentColor;
+      stroke: none
+    }
+
+    .hb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 8px
+    }
+
+    .hb button {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      font-size: 14px;
+      background: transparent;
+      color: var(--text-primary);
+      border: 0.5px solid var(--border-strong);
+      border-radius: var(--radius)
+    }
+
+    .hb button:hover {
+      background: var(--surface-1)
+    }
+
+    .hc {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--text-secondary)
+    }
+
+    #stack {
+      display: block;
+      width: 100%;
+      height: auto
+    }
+
+    #stack text {
+      font-family: inherit;
+      font-size: 12px
+    }
+
+    #stack .ts {
+      fill: var(--text-secondary)
+    }
+
+    #stack .th {
+      fill: var(--text-primary);
+      font-weight: 500
+    }
+
+    #txt,
+    #txt2 {
+      white-space: pre-line
+    }
+
+    #code {
+      display: none;
+      margin: 10px 0 0;
+      padding: 8px 10px;
+      background: var(--surface-1);
+      border-radius: var(--radius);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre;
+      overflow-x: auto;
+      color: var(--text-primary)
+    }
+
+    #txt2 {
+      display: none;
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin: 12px 0 0;
+      line-height: 1.5
+    }
+
+    #runrow {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0 0
+    }
+
+    #run {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 22px;
+      font-size: 16px;
+      font-weight: 500;
+      background: #D32F2F;
+      color: #fff;
+      border: none;
+      border-radius: var(--radius)
+    }
+
+    #run:hover {
+      background: #A32D2D
+    }
+
+    #run.pulse {
+      animation: pulse 1.2s ease-in-out infinite
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1)
+      }
+
+      50% {
+        transform: scale(1.06)
+      }
+    }
+
+    #runmsg {
+      font-size: 13px;
+      color: var(--text-primary);
+      line-height: 1.4
+    }
+
+    #flat {
+      display: grid;
+      grid-template-columns: repeat(8, 38px);
+      gap: 1px;
+      width: 311px;
+      max-width: 100%;
+      margin: 12px auto 8px
+    }
+
+    #flat div {
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 2px;
+      animation: pop .35s both;
+      transition: background .6s, color .6s
+    }
+
+    #flat div.on {
+      outline: 2px solid var(--text-primary);
+      outline-offset: -2px
+    }
+
+    @keyframes pop {
+      from {
+        opacity: 0;
+        transform: scale(.5)
+      }
+
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
+
+    #cnt {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-secondary);
+      min-height: 20px;
+      margin: 0 0 6px
+    }
+
+    #leg {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-secondary);
+      min-height: 20px
+    }
+
+    #leg span {
+      display: flex;
+      align-items: center;
+      gap: 4px
+    }
+
+    #leg i {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 2px
+    }
+
+    #tag {
+      display: inline-block;
+      margin: 8px 0 0;
+      padding: 2px 10px;
+      border-radius: var(--radius);
+      background: var(--bg-accent);
+      color: var(--text-accent);
+      font-size: 12px;
+      font-weight: 500
+    }
+
+    #ttl {
+      font-size: 16px;
+      font-weight: 500;
+      margin: 6px 0 2px
+    }
+
+    #txt {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin: 0;
+      line-height: 1.5
+    }
+
+    .lg {
+      transition: transform .7s ease, opacity .5s ease
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      #run.pulse {
+        animation: none
+      }
+
+      .lg {
+        transition: none
+      }
+
+      #flat div {
+        animation: none
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+    <h1 class="sr-only">Hansen Global Forest Change: animated stack of layers on an 8 by 8 grid</h1>
+    <svg id="stack" viewBox="0 0 380 190" role="img">
+      <title>Stack of three raster layers</title>
+      <desc>Three 8 by 8 grids stacked on top of each other, one is pulled out at a time.</desc>
+    </svg>
+    <div class="hb">
+      <button id="back" aria-label="Back"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h14M5 12l6 6M5 12l6-6" />
+        </svg>Back</button>
+      <button id="next" aria-label="Next">Next<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h14M13 18l6-6M13 6l6 6" />
+        </svg></button>
+      <button id="play" aria-label="Play"></button>
+      <span class="hc" id="count">1 / 6</span>
+    </div>
+    <div>
+      <span id="tag"></span>
+      <p id="ttl"></p>
+      <p id="txt"></p>
+    </div>
+    <pre id="code"></pre>
+    <p id="txt2"></p>
+    <div id="runrow"><button id="run" class="pulse" aria-label="Run script"><svg class="ic fill" viewBox="0 0 24 24"
+          aria-hidden="true">
+          <path d="M7 4v16l13-8z" />
+        </svg><span id="runlbl">Run</span></button><span id="runmsg"></span></div>
+    <div id="flat"></div>
+    <p id="cnt"></p>
+    <div id="leg"></div>
+  </main>
+  <script>
+    var PLAY_HTML = '<svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Play';
+    var PAUSE_HTML = '<svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>Pause';
+    document.getElementById("play").innerHTML = PLAY_HTML;
+    var N = 8, CS = 19, X0 = 92, GAP = 40, TOP = 24;
+    var tc = [[90, 94, 92, 85, 80, 86, 92, 94], [88, 93, 90, 18, 4, 70, 88, 91], [84, 90, 35, 3, 0, 40, 86, 90], [80, 70, 12, 0, 2, 10, 78, 92], [86, 88, 55, 4, 0, 1, 60, 90], [92, 94, 86, 40, 3, 0, 8, 75], [94, 96, 90, 82, 35, 2, 0, 30], [95, 97, 93, 88, 80, 40, 5, 0]];
+    var lossList = {"5,0": 3, "6,0": 3, "7,0": 4, "5,1": 5, "6,1": 5, "7,1": 5, "6,2": 6, "7,2": 6, "6,3": 12, "7,3": 12, "7,4": 18, "7,5": 15, "0,4": 19, "0,5": 21, "1,5": 21, "0,6": 22, "1,6": 22, "2,6": 22, "0,7": 23, "1,7": 23};
+    function clamp(v, a, b) {return Math.max(a, Math.min(b, v))}
+    var D = {tc: [], loss: [], ly: []};
+    for (var r = 0; r < N; r++)for (var c = 0; c < N; c++) {var y = lossList[c + "," + r] || 0; D.tc.push(tc[r][c]); D.loss.push(y ? 1 : 0); D.ly.push(y)}
+    function tcS(v) {var L = 93 - 62 * v / 100; return {bg: "hsl(135,40%," + L + "%)", fg: L < 55 ? "#fff" : "#1f3a24"}}
+    function lossS(v) {return v ? {bg: "#D85A30", fg: "#fff"} : {bg: "#E4E2D9", fg: "#5F5E5A"}}
+    function lyS(v) {if (!v) return {bg: "#E4E2D9", fg: "#5F5E5A"}; var h = (45 - (v - 5) * 5.6 + 360) % 360; return {bg: "hsl(" + h + ",75%,52%)", fg: v >= 12 ? "#fff" : "#3a2a00"}}
+    var SEL = {bg: "#1D9E75", fg: "#fff"}, NOSEL = {bg: "#E4E2D9", fg: "#5F5E5A"};
+    var L = [
+      {k: "tc", name: "treecover2000", f: tcS, ttl: "treecover2000", txt: "Tree canopy in the year 2000. Every pixel is a whole number from 0 to 100: the percent of the pixel covered by trees. Open ground and water sit near 0, dense forest near 100.", s1: "This script selects the pixels with canopy cover of 50% or more, which is a way to identify denser forested areas.", s2: "Using hansen.select('treecover2000') picks this layer out of the stack.\n\nUsing gte(50) examines every pixel and returns 1 where the value is 50 or more and 0 everywhere else.\n\nClick the run button to see the results.", code: "var forest = hansen.select('treecover2000')\n  .gte(50);", test: function (v) {return v >= 50}, what: "canopy of 50 or more", leg: [[0, "0"], [25, "25"], [50, "50"], [75, "75"], [100, "100"]]},
+      {k: "loss", name: "loss", f: lossS, ttl: "loss", txt: "Was a pixel cleared at any point from 2001 to 2024? Only two values are possible: 0 indicates no loss, 1 indicates loss. Loss can only happen for pixels with tree cover (as per the treecover2000 layer).", leg: [[0, "0 no loss"], [1, "1 loss"]]},
+      {k: "ly", name: "lossyear", f: lyS, ttl: "lossyear", txt: "Values 1 to 24 indicate the year of loss. For example, 12 refers to 2012 and 21 refers to 2021.", s1: "This script selects the pixels lost in 2021 or later, after the EUDR cutoff.", s2: "Using hansen.select('lossyear') picks this layer out of the stack.\n\nUsing gte(21) examines every pixel and returns 1 where the value is 21 or more and 0 everywhere else.\n\nClick the run button to see the results.", code: "var post2020 = hansen.select('lossyear')\n  .gte(21);", test: function (v) {return v >= 21}, what: "lost in 2021 or later", leg: [[0, "0 none"], [3, "3 = 2003"], [12, "12 = 2012"], [21, "21 = 2021"]]}
+    ];
+    var steps = [{t: "intro"}, {t: "explain", i: 0}, {t: "explain", i: 1}, {t: "explain", i: 2}, {t: "select", i: 0}, {t: "select", i: 2}];
+    var svg = document.getElementById("stack"), NS = "http://www.w3.org/2000/svg", groups = [], labels = [];
+    function yOf(i) {return TOP + i * GAP}
+    function tf(i, mode) {var x = X0, y = yOf(i); if (mode === "out") {x += 36; y -= 14} return "translate(" + x + "px," + y + "px) matrix(1,0,0.6,0.45,0,0)"}
+    for (var i = L.length - 1; i >= 0; i--) {
+      var g = document.createElementNS(NS, "g"); g.setAttribute("class", "lg"); g.style.transform = tf(i);
+      for (var r = 0; r < N; r++)for (var c = 0; c < N; c++) {var s = L[i].f(D[L[i].k][r * N + c]); var rc = document.createElementNS(NS, "rect"); rc.setAttribute("x", c * CS); rc.setAttribute("y", r * CS); rc.setAttribute("width", CS); rc.setAttribute("height", CS); rc.setAttribute("fill", s.bg); rc.setAttribute("stroke", "rgba(0,0,0,0.15)"); rc.setAttribute("stroke-width", "0.5"); g.appendChild(rc)}
+      var ol = document.createElementNS(NS, "rect"); ol.setAttribute("width", N * CS); ol.setAttribute("height", N * CS); ol.setAttribute("fill", "none"); ol.setAttribute("stroke", "#5F5E5A"); ol.setAttribute("stroke-width", "1.2"); g.appendChild(ol);
+      svg.appendChild(g); groups[i] = g;
+    }
+    for (var i = 0; i < L.length; i++) {var tx = document.createElementNS(NS, "text"); tx.setAttribute("x", 160); tx.setAttribute("y", yOf(i) + 54); tx.setAttribute("text-anchor", "end"); tx.setAttribute("class", "ts"); tx.style.transition = "opacity .5s"; tx.textContent = L[i].name; svg.appendChild(tx); labels[i] = tx}
+    var step = 0, timer = null, selTimer = null, running = false, done = false;
+    var flat = document.getElementById("flat"), leg = document.getElementById("leg"), cnt = document.getElementById("cnt"), code = document.getElementById("code"), tag = document.getElementById("tag"), runrow = document.getElementById("runrow"), runlbl = document.getElementById("runlbl"), runmsg = document.getElementById("runmsg"), runbtn = document.getElementById("run"), txt2 = document.getElementById("txt2");
+    function legHtml(items, f) {var h = ""; for (var j = 0; j < items.length; j++) {var s = f(items[j][0]); h += '<span><i style="background:' + s.bg + '"></i>' + items[j][1] + '</span>'} return h}
+    function curLayer() {return L[steps[step].i]}
+    function applySel() {
+      var l = curLayer(), n = 0, cells = flat.children;
+      for (var i = 0; i < cells.length; i++) {var v = D[l.k][i], d = cells[i]; if (l.test(v)) {d.style.background = SEL.bg; d.style.color = SEL.fg; d.textContent = "1"; d.classList.add("on"); n++} else {d.style.background = NOSEL.bg; d.style.color = NOSEL.fg; d.textContent = "0"} }
+      cnt.textContent = n + " of " + (N * N) + " pixels are 1 (" + l.what + "). The rest are 0.";
+      leg.innerHTML = '<span><i style="background:' + SEL.bg + '"></i>1 selected</span><span><i style="background:' + NOSEL.bg + '"></i>0 not selected</span>'
+    }
+    function clearSel() {
+      var l = curLayer(), cells = flat.children;
+      for (var i = 0; i < cells.length; i++) {var v = D[l.k][i], s = l.f(v), d = cells[i]; d.style.background = s.bg; d.style.color = s.fg; d.textContent = v; d.classList.remove("on")}
+      leg.innerHTML = legHtml(l.leg, l.f); cnt.textContent = ""
+    }
+    function resetRun() {running = false; done = false; runlbl.textContent = "Run"; runmsg.textContent = "Click Run to execute the script."; runbtn.classList.add("pulse")}
+    function runScript() {
+      if (running) return;
+      if (selTimer) {clearTimeout(selTimer); selTimer = null}
+      var again = done;
+      if (again) clearSel();
+      running = true; runlbl.textContent = "Running"; runmsg.textContent = "Running the script..."; runbtn.classList.remove("pulse");
+      var stepAtStart = step;
+      setTimeout(function () {
+        if (step !== stepAtStart) {running = false; return }
+        applySel(); running = false; done = true; runlbl.textContent = "Run again"; runmsg.textContent = "Done. Selected pixels are now 1."
+      }, again ? 900 : 1000)
+    }
+    function render() {
+      if (selTimer) {clearTimeout(selTimer); selTimer = null}
+      var st = steps[step], sel = st.t === "intro" ? -1 : st.i;
+      for (var i = 0; i < L.length; i++) {
+        if (sel < 0) {groups[i].style.transform = tf(i); groups[i].style.opacity = 1; labels[i].style.opacity = 1; labels[i].setAttribute("class", "ts")}
+        else if (i === sel) {groups[i].style.transform = tf(i, "out"); groups[i].style.opacity = 1; labels[i].style.opacity = 1; labels[i].setAttribute("class", "th")}
+        else {groups[i].style.transform = tf(i); groups[i].style.opacity = i < sel ? 0.1 : 0.3; labels[i].style.opacity = 0.35; labels[i].setAttribute("class", "ts")}
+      }
+      document.getElementById("count").textContent = (step + 1) + " / " + steps.length;
+      if (st.t === "intro") {tag.textContent = "Overview"; document.getElementById("ttl").textContent = "Hansen Global Forest Change"; document.getElementById("txt").textContent = "The Hansen Global Forest Change dataset is derived from Landsat imagery and maps tree cover and forest loss worldwide at 30 m resolution. It is distributed as a stack of raster layers. This example is based on version 1.12 (2000 to 2024) and uses a simplified 8 \u00d7 8 grid to show how the layers relate."; code.style.display = "none"; txt2.style.display = "none"; runrow.style.display = "none"; flat.style.display = "none"; cnt.textContent = ""; leg.innerHTML = ""; return }
+      var l = L[st.i];
+      flat.style.display = "grid"; flat.innerHTML = ""; cnt.textContent = "";
+      for (var r = 0; r < N; r++)for (var c = 0; c < N; c++) {var v = D[l.k][r * N + c], s = l.f(v), d = document.createElement("div"); d.style.background = s.bg; d.style.color = s.fg; d.style.animationDelay = ((r + c) * 35) + "ms"; d.textContent = v; flat.appendChild(d)}
+      leg.innerHTML = legHtml(l.leg, l.f);
+      if (st.t === "explain") {tag.textContent = "Part 1: the layers"; document.getElementById("ttl").textContent = l.ttl; document.getElementById("txt").textContent = l.txt; code.style.display = "none"; txt2.style.display = "none"; runrow.style.display = "none"}
+      else {
+        tag.textContent = "Part 2: run a selection"; document.getElementById("ttl").textContent = l.ttl; document.getElementById("txt").textContent = l.s1; code.textContent = l.code; code.style.display = "block"; txt2.textContent = l.s2; txt2.style.display = "block"; runrow.style.display = "flex"; resetRun(); cnt.textContent = "Click the red Run button to run the script on this layer.";
+        if (timer) {selTimer = setTimeout(runScript, 3000)}
+      }
+    }
+    function go(n) {step = clamp(n, 0, steps.length - 1); render()}
+    function stopPlay() {if (timer) {clearTimeout(timer); timer = null} document.getElementById("play").innerHTML = PLAY_HTML}
+    function tick() {if (step >= steps.length - 1) {stopPlay(); return } go(step + 1); timer = setTimeout(tick, steps[step].t === "select" ? 11000 : 5000)}
+    document.getElementById("next").onclick = function () {stopPlay(); go(step + 1)};
+    document.getElementById("back").onclick = function () {stopPlay(); go(step - 1)};
+    runbtn.onclick = function () {stopPlay(); runScript()};
+    document.getElementById("play").onclick = function () {
+      if (timer) {stopPlay(); return }
+      if (step >= steps.length - 1) go(0);
+      document.getElementById("play").innerHTML = PAUSE_HTML;
+      timer = setTimeout(tick, 11000)
+    };
+    render();
+  </script>
+</body>
+
+</html>
