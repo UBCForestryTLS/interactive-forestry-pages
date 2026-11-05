@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testing claims about cocoa deforestation: layer stack</title>
+<style>
+:root{
+  --page:#FFFFFF;
+  --text-primary:#1F1F1E;
+  --text-secondary:#5F5E5A;
+  --surface-1:#F4F3EE;
+  --border:rgba(0,0,0,0.15);
+  --border-strong:rgba(0,0,0,0.3);
+  --bg-accent:#E6F1FB;
+  --text-accent:#185FA5;
+  --radius:8px;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --page:#1A1A18;
+    --text-primary:#ECEBE6;
+    --text-secondary:#B4B2A9;
+    --surface-1:#2C2C2A;
+    --border:rgba(255,255,255,0.18);
+    --border-strong:rgba(255,255,255,0.35);
+    --bg-accent:#0C2F4F;
+    --text-accent:#85B7EB;
+  }
+}
+*{box-sizing:border-box}
+html{background:var(--page)}
+body{margin:0;background:var(--page);color:var(--text-primary);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.5}
+.wrap{max-width:440px;margin:0 auto;padding:16px 16px 40px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+button{font:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--text-accent);outline-offset:2px}
+.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.fill{fill:currentColor;stroke:none}
+.hb button{background:transparent;color:var(--text-primary);border:0.5px solid var(--border-strong);border-radius:var(--radius)}
+.hb button:hover{background:var(--surface-1)}
+#stack{display:block;width:100%;height:auto}
+#stack text{font-family:inherit;font-size:12px}
+#stack .ts{fill:var(--text-secondary)}
+#stack .th{fill:var(--text-primary);font-weight:500}
+@media (prefers-reduced-motion:reduce){
+  #run.pulse{animation:none}
+  .lg{transition:none}
+  #flat div{animation:none}
+}
+
+.hb{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+.hb button{display:flex;align-items:center;gap:4px;padding:6px 12px;font-size:14px}
+.hc{margin-left:auto;font-size:13px;color:var(--text-secondary)}
+#txt,#txt2{white-space:pre-line}
+#code{display:none;margin:10px 0 0;padding:8px 10px;background:var(--surface-1);border-radius:var(--radius);font-family:var(--font-mono);font-size:12px;line-height:1.5;white-space:pre;overflow-x:auto;color:var(--text-primary)}
+#txt2{display:none;font-size:14px;color:var(--text-secondary);margin:12px 0 0;line-height:1.5}
+#runrow{display:none;align-items:center;gap:12px;padding:10px 0 0}
+#run{display:flex;align-items:center;gap:6px;padding:9px 22px;font-size:16px;font-weight:500;background:#D32F2F;color:#fff;border:none;border-radius:var(--radius);cursor:pointer}
+#run:hover{background:#A32D2D}
+#run.pulse{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+#runmsg{font-size:13px;color:var(--text-primary);line-height:1.4}
+#flat{display:grid;gap:2px;width:310px;margin:12px auto 8px}
+#flat.g4{grid-template-columns:repeat(4,76px)}
+#flat.g4 div{height:76px;font-size:22px}
+#flat.g12{grid-template-columns:repeat(12,24px)}
+#flat.g12 div{height:24px;font-size:9px}
+#flat div{display:flex;align-items:center;justify-content:center;font-weight:500;border-radius:2px;animation:pop .35s both;transition:background .6s,color .6s}
+#flat div.ex{outline:3px dashed #E53935;outline-offset:-5px}
+@keyframes pop{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:none}}
+#cnt{text-align:center;font-size:13px;color:var(--text-secondary);min-height:20px;margin:0 0 6px}
+#leg{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary);min-height:20px}
+#leg span{display:flex;align-items:center;gap:4px}
+#leg i{display:inline-block;width:14px;height:14px;border-radius:2px}
+#leg i.ring{border:2.5px solid;box-sizing:border-box}
+#leg i.dash{border:2px dashed;box-sizing:border-box}
+#tag{display:inline-block;margin:8px 0 0;padding:2px 10px;border-radius:var(--radius);background:var(--bg-accent);color:var(--text-accent);font-size:12px;font-weight:500}
+.lg{transition:transform .7s ease,opacity .5s ease}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1 class="sr-only">Testing claims about cocoa deforestation: Animated stack of map layers showing how the cocoa lab layers are combined. The Hansen layers are 4 by 4 pixels and the cocoa layers are 12 by 12 pixels.</h1>
+
+<svg id="stack" width="100%" viewBox="0 0 380 110" role="img"><title>Stack of map layers</title><desc>Coarse Hansen layers and finer cocoa layers stacked together, with one layer pulled out at a time.</desc></svg>
+<div class="hb">
+<button id="back" aria-label="Back"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M5 12l6 6M5 12l6-6"/></svg>Back</button>
+<button id="next" aria-label="Next">Next<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 18l6-6M13 6l6 6"/></svg></button>
+<button id="play" aria-label="Play"><svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Play</button>
+<span class="hc" id="count">1 / 6</span>
+</div>
+<div>
+<span id="tag"></span>
+<p id="ttl" style="font-size:16px;font-weight:500;margin:6px 0 2px"></p>
+<p id="txt" style="font-size:14px;color:var(--text-secondary);margin:0;line-height:1.5"></p>
+</div>
+<pre id="code"></pre>
+<p id="txt2"></p>
+<div id="runrow"><button id="run" class="pulse" aria-label="Run script"><svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg><span id="runlbl">Run</span></button><span id="runmsg"></span></div>
+<div id="flat"></div>
+<p id="cnt"></p>
+<div id="leg"></div>
+<script>
+var X0=92,TOP=24,PL=152,NS="http://www.w3.org/2000/svg";
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+var TC=[85,90,60,35,88,92,45,20,40,70,90,55,25,50,88,30];
+var LY=[0,14,0,0,8,0,22,9,0,12,6,17,10,0,25,0];
+var FO=[],LB=[],CP=[],LBF=[],IC=[],LC=[];
+for(var h=0;h<16;h++){FO[h]=TC[h]>=30?1:0;LB[h]=(LY[h]>0&&LY[h]<=20&&FO[h])?1:0}
+for(var fy=0;fy<12;fy++)for(var fx=0;fx<12;fx++){
+var f=fy*12+fx,b=Math.max(0,1-Math.abs(fy-(8-0.35*fx))/3.2),patch=0.7*Math.exp(-((fx-1)*(fx-1)+(fy-4)*(fy-4))/4),noise=((fx*37+fy*91)%17)/17*0.14-0.07;
+CP[f]=Math.round(clamp(0.1+0.85*Math.max(b,patch)+noise,0.02,0.97)*100)/100;
+var hi=Math.floor(fy/3)*4+Math.floor(fx/3);
+LBF[f]=LB[hi];IC[f]=CP[f]>=0.54?1:0;LC[f]=(LBF[f]&&IC[f])?1:0}
+function sum(a){var s=0;for(var i=0;i<a.length;i++)s+=a[i];return s}
+var C={forest:"#4C9A5F",loss:"#E53935",cocoa:"#F29A2E",lc:"#7B3FA0"};
+var GRAYC={bg:"#E4E2D9",fg:"#5F5E5A"};
+function tcS(v){var L=93-62*v/100;return{bg:"hsl(135,40%,"+L+"%)",fg:L<55?"#fff":"#1f3a24"}}
+function lyS(v){if(!v)return{bg:GRAYC.bg,fg:GRAYC.fg};var L=88-50*v/25;return{bg:"hsl(210,70%,"+L+"%)",fg:L<55?"#fff":"#10263d"}}
+var RAMP=[[245,222,179],[205,133,63],[139,69,19],[128,0,0]];
+function cpS(v){if(v<0.1)return{bg:"#F3F1EA",fg:"#5F5E5A"};var t=(v-0.1)/0.9*3,k=Math.min(2,Math.floor(t)),f=t-k,a=RAMP[k],b=RAMP[k+1];var rgb=[0,1,2].map(function(x){return Math.round(a[x]+(b[x]-a[x])*f)});return{bg:"rgb("+rgb.join(",")+")",fg:(v-0.1)/0.9>0.3?"#fff":"#3a2a00"}}
+function bin(v,col){return v?{bg:col,fg:"#fff",tx:"1"}:{bg:GRAYC.bg,fg:GRAYC.fg,tx:"0"}}
+function cell(view,i){
+var o,s;
+switch(view){
+case "tc":s=tcS(TC[i]);return{bg:s.bg,fg:s.fg,tx:String(TC[i])};
+case "ly":s=lyS(LY[i]);return{bg:s.bg,fg:s.fg,tx:String(LY[i])};
+case "forest":return bin(FO[i],C.forest);
+case "lb":return bin(LB[i],C.loss);
+case "cp":s=cpS(CP[i]);return{bg:s.bg,fg:s.fg,tx:CP[i].toFixed(2).replace(/^0/,"")};
+case "ic":return bin(IC[i],C.cocoa);
+case "lc":return bin(LC[i],C.lc);
+case "lbov":o=bin(LBF[i],C.loss);if(IC[i])o.sh="inset 0 0 0 3px "+C.cocoa+",inset 0 0 0 5px #fff";return o}
+}
+var VG={tc:4,ly:4,forest:4,lb:4,cp:12,ic:12,lc:12,lbov:12};
+var LEG={
+tc:[{c:tcS(0).bg,t:"0"},{c:tcS(25).bg,t:"25"},{c:tcS(50).bg,t:"50"},{c:tcS(75).bg,t:"75"},{c:tcS(100).bg,t:"100"}],
+ly:[{c:GRAYC.bg,t:"0 none"},{c:lyS(6).bg,t:"6 = 2006"},{c:lyS(12).bg,t:"12 = 2012"},{c:lyS(22).bg,t:"22 = 2022"}],
+cp:[{c:cpS(0.05).bg,t:"<0.1"},{c:cpS(0.4).bg,t:"0.4"},{c:cpS(0.7).bg,t:"0.7"},{c:cpS(1).bg,t:"1.0"}],
+forest:[{c:C.forest,t:"1 forest"},{c:GRAYC.bg,t:"0 not forest"}],
+lb:[{c:C.loss,t:"1 loss"},{c:GRAYC.bg,t:"0 none"}],
+ic:[{c:C.cocoa,t:"1 cocoa"},{c:GRAYC.bg,t:"0 not cocoa"}],
+lc:[{c:C.lc,t:"1 loss on cocoa"},{c:GRAYC.bg,t:"0"}],
+lbov:[{c:C.loss,t:"1 loss"},{c:GRAYC.bg,t:"0"},{c:C.cocoa,t:"cocoa pixel",k:"ring"}]
+};
+var RUNMSG="\n\nClick the run button to see the results.";
+var steps=[
+{tag:"Overview",ttl:"Testing claims about cocoa deforestation",txt:"This exercise examines whether cocoa production is driving forest loss in protected areas. We use raster layers from the Hansen dataset and a new cocoa dataset.",vis:["tc","ly","cp"],focus:[]},
+{tag:"Part 1: Hansen layers",ttl:"treecover2000 (Hansen)",txt:"Percent tree cover in the year 2000. Every 30 m pixel is a whole number from 0 to 100. We count a pixel as forest if its tree cover is at least 30 percent.",code:"var hansen = ee.Image(\n  'UMD/hansen/global_forest_change_2025_v1_13');\nvar treecover2000 = hansen.select('treecover2000');\nvar forest2000 = treecover2000.gte(30);",s2:"Using gte(30) examines every pixel and returns 1 where the tree cover is 30 or more and 0 everywhere else."+RUNMSG,view:"tc",vis:["tc","ly"],focus:["tc"],
+ run:{to:"forest",stack:{vis:["forest","tc","ly"],focus:["forest"]},msg:function(){return sum(FO)+" of "+FO.length+" pixels are forest (1)."}}},
+{tag:"Part 1: Hansen layers",ttl:"lossyear (Hansen)",txt:"The year of tree-cover loss. 0 indicates no loss. Values 1 to 25 indicate the years 2001 to 2025.",code:"var loss = hansen.select('lossyear');",view:"ly",vis:["forest","tc","ly"],focus:["ly"]},
+{tag:"Part 1: Hansen layers",ttl:"lossBefore",txt:"This script selects pixels experiencing tree-cover loss from 2001 up to the 2020 cut-off. But only for pixels meeting the 30% tree cover definition (in the year 2000).",code:"var lossBefore = loss.gte(1)\n  .and(loss.lte(20))\n  .and(forest2000);",s2:"Using gte(1) selects loss years greater than or equal to 1 whereas and lte(20) selects pixels less than or equal to 20. Used together, this selects years 2001 to 2020.\n\nUsing and(forest2000) keeps only pixels that were forest in 2000."+RUNMSG,view:"ly",vis:["forest","tc","ly"],focus:["ly"],
+ run:{to:"lb",marks:function(i){return LY[i]>0&&!LB[i]},stack:{vis:["lb","forest","tc","ly"],focus:["lb"]},msg:function(){return sum(LB)+" of "+LB.length+" pixels are 1: loss in 2001 to 2020 on forest. Dashed outlines show loss that was left out."},legExtra:[{c:C.loss,t:"left out",k:"dash"}]}},
+{tag:"Part 2: cocoa layer",ttl:"Cocoa probability (Forest Data Partnership)",txt:"The probability that each pixel is cocoa in 2020, ranging from 0 - 1. These probabilities get converted to a binary layer using a chosen threshold (such as 0.54) above which a pixel is assumed to be cocoa. Notice this layer has 10 m pixels (finer grain than Hansen\u2019s 30 m).",code:"var cocoaProb = ee.ImageCollection(\n  'projects/forestdatapartnership/assets/cocoa/model_2026a')\n  .filterDate('2020-01-01', '2020-12-31')\n  .mosaic()\n  .select('probability');\nvar isCocoa = cocoaProb.gte(0.54);",s2:"Using ee.ImageCollection() opens the cocoa dataset, which is a collection of map images.\n\nUsing filterDate() keeps only the images from 2020.\n\nUsing mosaic() stitches those images together into one seamless map.\n\nUsing select('probability') picks the layer that holds the cocoa probability.\n\nUsing gte(0.54) returns 1 where the probability is 0.54 or more and 0 everywhere else."+RUNMSG,view:"cp",vis:["lb","forest","tc","ly","cp"],focus:["cp"],
+ run:{to:"ic",stack:{vis:["lb","ic","forest","tc","ly","cp"],focus:["ic"]},msg:function(){return sum(IC)+" of "+IC.length+" pixels are cocoa (1)."}}},
+{tag:"Part 3: overlay",ttl:"lossCocoa",txt:"This script overlays the two binary maps we just created, in order to identify where tree-cover loss pixels overlap with cocoa pixels.",code:"var lossCocoa =\n  lossBefore.and(isCocoa);",s2:"The grid shows two binary layers: the \u201clossBefore\u201d layer shown in red as well as the cocoa pixels layer outlined in orange. Using and() keeps a pixel only where both layers = 1. Resulting map is shown in purple."+RUNMSG,view:"lbov",vis:["lb","ic","forest","tc","ly","cp"],focus:["lb","ic"],
+ run:{to:"lc",stack:{vis:["lc","lb","ic","forest","tc","ly","cp"],focus:["lc"]},msg:function(){return sum(LC)+" of "+LC.length+" pixels are 1: tree-cover loss on cocoa."}}}
+];
+var MASTER=["lc","lb","ic","forest","tc","ly","cp"];
+var GL={tc:4,ly:4,cp:12,forest:4,lb:4,ic:12,lc:12};
+var NAMES={tc:"treecover2000",ly:"lossyear",cp:"cocoaProb",forest:"forest2000",lb:"lossBefore",ic:"isCocoa",lc:"lossCocoa"};
+var svg=document.getElementById("stack"),groups={},labels={};
+function tf(y,pulled){var x=X0+(pulled?36:0),yy=y-(pulled?14:0);return"translate("+x+"px,"+yy+"px) matrix(1,0,0.6,0.45,0,0)"}
+for(var m=MASTER.length-1;m>=0;m--){
+var id=MASTER[m],gs=GL[id],cs=PL/gs;
+var g=document.createElementNS(NS,"g");g.setAttribute("class","lg");g.style.transform=tf(TOP-30,false);g.style.opacity=0;
+for(var i=0;i<gs*gs;i++){var rc=document.createElementNS(NS,"rect");rc.setAttribute("x",(i%gs)*cs);rc.setAttribute("y",Math.floor(i/gs)*cs);rc.setAttribute("width",cs);rc.setAttribute("height",cs);rc.setAttribute("fill",cell(id,i).bg);rc.setAttribute("stroke","rgba(0,0,0,0.15)");rc.setAttribute("stroke-width",gs===4?0.6:0.25);g.appendChild(rc)}
+var ol=document.createElementNS(NS,"rect");ol.setAttribute("width",PL);ol.setAttribute("height",PL);ol.setAttribute("fill","none");ol.setAttribute("stroke","#5F5E5A");ol.setAttribute("stroke-width","1.2");g.appendChild(ol);
+svg.appendChild(g);groups[id]=g}
+for(var m2=0;m2<MASTER.length;m2++){var id2=MASTER[m2];var tx=document.createElementNS(NS,"text");tx.setAttribute("x",0);tx.setAttribute("y",0);tx.setAttribute("text-anchor","end");tx.setAttribute("class","ts");tx.style.transition="opacity .5s,transform .7s ease";tx.style.opacity=0;tx.textContent=NAMES[id2];svg.appendChild(tx);labels[id2]=tx}
+function layoutStack(st){
+var vis=st.vis,n=vis.length,gap=n<=3?40:(n===4?34:26),H=TOP+(n-1)*gap+68+18,focus=st.focus||[],low=-1;
+svg.setAttribute("viewBox","0 0 380 "+H);
+vis.forEach(function(id,k){if(focus.indexOf(id)>=0)low=Math.max(low,k)});
+MASTER.forEach(function(id){
+var k=vis.indexOf(id);
+if(k<0){groups[id].style.opacity=0;labels[id].style.opacity=0;return}
+var y=TOP+k*gap,pulled=focus.indexOf(id)>=0;
+groups[id].style.transform=tf(y,pulled);
+groups[id].style.opacity=focus.length===0?1:(pulled?1:(k<low?0.1:0.3));
+labels[id].style.transform="translate(160px,"+(y+72-gap/2)+"px)";
+labels[id].style.opacity=focus.length===0?1:(pulled?1:0.35);
+labels[id].setAttribute("class",pulled?"th":"ts")})}
+var step=0,timer=null,selTimer=null,running=false,done=false;
+var flat=document.getElementById("flat"),leg=document.getElementById("leg"),cnt=document.getElementById("cnt"),code=document.getElementById("code"),tag=document.getElementById("tag"),runrow=document.getElementById("runrow"),runlbl=document.getElementById("runlbl"),runmsg=document.getElementById("runmsg"),runbtn=document.getElementById("run"),txt2=document.getElementById("txt2");
+function legHtml(items){var h="";for(var j=0;j<items.length;j++){var it=items[j],sw=it.k==="ring"?'<i class="ring" style="border-color:'+it.c+'"></i>':(it.k==="dash"?'<i class="dash" style="border-color:'+it.c+'"></i>':'<i style="background:'+it.c+'"></i>');h+="<span>"+sw+it.t+"</span>"}return h}
+function applyView(view,marks){
+var cells=flat.children;
+for(var i=0;i<cells.length;i++){var o=cell(view,i),d=cells[i];d.style.background=o.bg;d.style.color=o.fg;d.style.boxShadow=o.sh||"none";d.textContent=o.tx;d.className=(marks&&marks(i))?"ex":""}}
+function buildGrid(view){
+var g=VG[view];
+flat.innerHTML="";
+flat.className="g"+g;
+var stp=g===4?60:18;
+for(var i=0;i<g*g;i++){var d=document.createElement("div");d.style.animationDelay=((Math.floor(i/g)+(i%g))*stp)+"ms";flat.appendChild(d)}
+applyView(view)}
+function updateNext(){
+var nx=document.getElementById("next"),st=steps[step],ready=step>=steps.length-1&&(done||!st.run);
+nx.innerHTML=ready?'<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Start over':'Next<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 18l6-6M13 6l6 6"/></svg>';
+nx.setAttribute("aria-label",ready?"Start over":"Next")}
+function resetRun(){running=false;done=false;runlbl.textContent="Run";runmsg.textContent="Click Run to execute the script.";runbtn.classList.add("pulse")}
+function runScript(){
+var st=steps[step];
+if(running||!st.run)return;
+if(selTimer){clearTimeout(selTimer);selTimer=null}
+var again=done;
+if(again){applyView(st.view);leg.innerHTML=legHtml(LEG[st.view]);cnt.textContent="";layoutStack(st);done=false;updateNext()}
+running=true;runlbl.textContent="Running";runmsg.textContent="Running the script...";runbtn.classList.remove("pulse");
+var stepAtStart=step;
+setTimeout(function(){
+if(step!==stepAtStart){running=false;return}
+applyView(st.run.to,st.run.marks);
+leg.innerHTML=legHtml(LEG[st.run.to].concat(st.run.legExtra||[]));
+cnt.textContent=st.run.msg();
+if(st.run.stack)layoutStack(st.run.stack);
+running=false;done=true;updateNext();runlbl.textContent="Run again";runmsg.textContent="Done."},again?900:1000)}
+function render(){
+if(selTimer){clearTimeout(selTimer);selTimer=null}
+var st=steps[step];
+layoutStack(st);
+document.getElementById("count").textContent=(step+1)+" / "+steps.length;
+tag.textContent=st.tag;
+document.getElementById("ttl").textContent=st.ttl;
+document.getElementById("txt").textContent=st.txt;
+if(st.code){code.textContent=st.code;code.style.display="block"}else{code.style.display="none"}
+if(st.s2){txt2.textContent=st.s2;txt2.style.display="block"}else{txt2.style.display="none"}
+if(st.run){runrow.style.display="flex";resetRun()}else{runrow.style.display="none"}
+if(st.view){flat.style.display="grid";buildGrid(st.view);leg.innerHTML=legHtml(LEG[st.view]);cnt.textContent=st.run?"Click the red Run button to run the script on this layer.":""}
+else{flat.style.display="none";leg.innerHTML="";cnt.textContent=""}
+updateNext();
+if(st.run&&timer){selTimer=setTimeout(runScript,3000)}}
+function go(n){step=clamp(n,0,steps.length-1);render()}
+function stopPlay(){if(timer){clearTimeout(timer);timer=null}document.getElementById("play").innerHTML='<svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Play'}
+function tick(){if(step>=steps.length-1){stopPlay();return}go(step+1);var s=steps[step];timer=setTimeout(tick,s.run?11000:(s.view?6500:8000))}
+document.getElementById("next").onclick=function(){stopPlay();var st=steps[step];if(step>=steps.length-1){if(!st.run||done)go(0);else runScript()}else go(step+1)};
+document.getElementById("back").onclick=function(){stopPlay();go(step-1)};
+runbtn.onclick=function(){stopPlay();runScript()};
+document.getElementById("play").onclick=function(){
+if(timer){stopPlay();return}
+if(step>=steps.length-1)go(0);
+document.getElementById("play").innerHTML='<svg class="ic fill" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>Pause';
+timer=setTimeout(tick,9000)};
+render();
+</script>
+
+</main>
+</body>
+</html>
