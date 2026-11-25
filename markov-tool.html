@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markov Land-Change Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+/* Layout idea: a field-notebook two-tab tool; matrices are the hero, left-aligned, ruled like a survey table. */
+:root{
+  --bg:#f4f2ec; --surface:#ffffff; --ink:#1f2a24; --muted:#5d6a62; --line:#d6d3c8;
+  --accent:#2f6f4e; --accent-ink:#ffffff; --warn:#a4452c; --warn-bg:#f8e6e0; --ok:#2f6f4e; --ok-bg:#e1efe6; --hl:#eef4ea;
+  --c1:#8b4513; --c2:#6fc26f; --c3:#8a9a1b; --c4:#4a7023; --c5:#1f3d10;
+  --display:"Source Serif 4",Georgia,serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Sans",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#161b18; --surface:#1f2622; --ink:#e8ece8; --muted:#9aa89f; --line:#35403a;
+    --accent:#6bbf8f; --accent-ink:#0f1a14; --warn:#f0a58f; --warn-bg:#3b2620; --ok:#7fd0a0; --ok-bg:#1d3326; --hl:#243029;
+    --c1:#d9965b; --c2:#9ee89e; --c3:#c2d24a; --c4:#7fb04a; --c5:#4f8a35; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#161b18; --surface:#1f2622; --ink:#e8ece8; --muted:#9aa89f; --line:#35403a;
+  --accent:#6bbf8f; --accent-ink:#0f1a14; --warn:#f0a58f; --warn-bg:#3b2620; --ok:#7fd0a0; --ok-bg:#1d3326; --hl:#243029;
+  --c1:#d9965b; --c2:#9ee89e; --c3:#c2d24a; --c4:#7fb04a; --c5:#4f8a35; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+h1{font:600 28px/1.15 var(--display);margin:0 0 4px;text-wrap:balance}
+h2{font:600 20px/1.2 var(--display);margin:0 0 10px;text-wrap:balance}
+h3{font:600 16px/1.3 var(--body);margin:0 0 6px;color:var(--ink)}
+.sub{color:var(--muted);margin:0 0 18px;max-width:65ch}
+nav{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:18px}
+nav button{font:500 15px var(--body);background:none;border:0;padding:10px 16px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+nav button:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:16px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+input,select,textarea{font:15px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px}
+input[type=number]{font-family:var(--mono);width:88px}
+input.nm{width:172px}
+textarea{width:100%;font-family:var(--body);font-size:15px;min-height:96px}
+details summary{cursor:pointer;font-weight:600;color:var(--accent)}
+button.btn{font:500 14px var(--body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:4px;padding:7px 12px;cursor:pointer}
+button.btn:hover{background:var(--hl)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.primary:hover{filter:brightness(1.08);background:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.scroll{overflow-x:auto}
+table.m{border-collapse:collapse;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums}
+table.m th,table.m td{border:1px solid var(--line);padding:6px 12px;text-align:right}
+table.m th{background:var(--hl);font-family:var(--body);font-weight:600;font-size:13px}
+table.m th.rl{text-align:left}
+table.m td.z{color:var(--muted)}
+table.m td.tot{background:var(--hl);color:var(--muted)}
+table.dt td,table.dt th{padding:3px 8px}
+table.dt td:first-child{color:var(--muted);text-align:center}
+.datawrap{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:4px}
+.pill{display:inline-block;font:500 12px var(--mono);padding:2px 8px;border-radius:99px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.bad{background:var(--warn-bg);color:var(--warn)}
+.intro{font-size:14px;margin:0 0 12px}
+.note{font-size:14px;color:var(--muted);margin:8px 0 0;max-width:70ch}
+.msg{font-size:14px;margin:8px 0 0;padding:8px 10px;border-radius:4px;background:var(--warn-bg);color:var(--warn)}
+.msg.info{background:var(--hl);color:var(--ink)}
+.eq{font-family:var(--mono);font-size:14px;margin:6px 0;overflow-wrap:anywhere}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;margin-bottom:6px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+svg text{fill:var(--muted);font:13px var(--body)}
+.hidden{display:none}
+@media(prefers-reduced-motion:no-preference){nav button{transition:color .15s}}
+@media(max-width:520px){table.m input[type=number]{width:76px;padding:6px 4px;font-size:14px}table.m th,table.m td{padding:6px 6px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Markov land-change calculator</h1>
+  <p class="sub">A tool for exploring Markov models of land change. First, build a transition matrix based on land cover at two different years, then project the landscape into the future.</p>
+  <nav role="tablist" aria-label="Calculator pages">
+    <button role="tab" id="tab-build" aria-selected="true" aria-controls="page-build">Build a Model</button>
+    <button role="tab" id="tab-project" aria-selected="false" aria-controls="page-project">Project a Model</button>
+  </nav>
+
+  <!-- PAGE 1 -->
+  <div id="page-build" role="tabpanel" aria-labelledby="tab-build">
+    <section class="card">
+      <h2>Set up</h2>
+      <div class="row">
+        <label for="n1">Number of states
+          <select id="n1"><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+        <label for="y1">Map year (earlier)<input id="y1" type="number" value="2000"></label>
+        <label for="y2">Map year (later)<input id="y2" type="number" value="2010"></label>
+        <button class="btn" id="resetEx" type="button">Reset to example</button>
+        <button class="btn" id="clear1" type="button">Clear</button>
+      </div>
+      <div class="row" id="names1" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card">
+      <h2>Data Entry</h2>
+      <p class="note" style="margin-top:0">Each row is a point and each column identifies its cover type in a different year.</p>
+      <div class="datawrap" style="margin-top:10px"><table class="m dt" style="width:100%"><thead><tr><th>Point</th><th id="h1">2000</th><th id="h2">2010</th></tr></thead><tbody id="rows1"></tbody></table></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="addrow" type="button">Add a point</button><button class="btn" id="delrow" type="button">Remove last point</button></div>
+      <h3 style="margin-top:18px">Proportions of points in each land cover type (represented as vectors)</h3>
+      <div class="scroll" id="vecs"></div>
+      <p class="note">Each row is a vector of proportions that sums to 1: X<sub>t</sub> for the earlier year and X<sub>t+1</sub> for the later year.</p>
+      <details style="margin-top:16px">
+        <summary>Have your data in a spreadsheet? Paste it instead</summary>
+        <p class="note">Copy two columns from your spreadsheet (land cover type in the earlier year, then in the later year, one row per point) and paste them here.</p>
+        <textarea id="paste" aria-label="Pasted spreadsheet columns" placeholder="Paste here"></textarea>
+        <div class="row" style="margin-top:8px"><button class="btn" id="dopaste" type="button">Use pasted data</button></div>
+        <div id="pastemsg"></div>
+      </details>
+    </section>
+
+    <section class="card" id="res1">
+      <h2>Steps for creating a transition matrix (P)</h2>
+      <div style="display:grid;gap:18px">
+        <div><h3>Raw Tally Matrix</h3><p class="note" style="margin-top:0">First, count the number of points that converted from one cover type to another.</p><div class="scroll" id="tally"></div></div>
+        <div><h3>Transition Probability Matrix (P)</h3><p class="note" style="margin-top:0">Next, convert the original tallies into probabilities by dividing each tally by its associated row total. Every row in the new table should sum to 1.</p><div class="scroll" id="pmat"></div></div>
+        <div><h3>Create an Annual Probability Matrix (P)</h3><p class="note" style="margin-top:0">It’s generally easier to think about land change modelling in terms of yearly change. This step converts the first P matrix to show the annual probabilities for each transition. Rows must still sum to 1.</p><div class="scroll" id="annual"></div><p class="note" id="annnote"></p></div>
+      </div>
+      <div id="warn1"></div>
+      <div class="row" style="margin-top:14px"><button class="btn primary" id="use" type="button">Next: Project a Model →</button></div>
+      <div id="copymsg1"></div>
+    </section>
+  </div>
+
+  <!-- PAGE 2 -->
+  <div id="page-project" role="tabpanel" aria-labelledby="tab-project" class="hidden">
+    <p class="note intro">Multiply the initial conditions vector (t = 0) by P to project the landscape forward in time.</p>
+    <section class="card">
+      <h2>Initial conditions vector (t = 0) and annual probability matrix (P)</h2>
+      <input id="x0year" type="hidden" value="2000"><input id="dt" type="hidden" value="1">
+      <div class="scroll" style="margin-top:14px" id="inputs2"></div>
+      <p class="note">Values automatically come from the previous page but you can edit here if needed.</p>
+      <div id="warn2"></div>
+    </section>
+
+    <section class="card">
+      <h2>Projection</h2>
+      <div class="row" style="margin-bottom:10px"><label for="N">Years to project<input id="N" type="number" min="1" max="100" value="20"></label></div>
+      <h3>Projected proportions of each land cover type</h3>
+      <div class="legend" id="legend"></div>
+      <div id="chart"></div>
+      <h3 style="margin-top:18px">Projection table</h3>
+      <div class="scroll"><table class="m" id="outtab"></table></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="copyOut" type="button">Copy table</button></div>
+      <div id="copymsg2"></div>
+    </section>
+
+    <section class="card">
+      <h2>Show me the detailed calculations for the projections</h2>
+      <div class="row"><label for="kstep">Choose year:<select id="kstep"></select></label></div>
+      <div id="math" style="margin-top:10px"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+"use strict";
+const MAXN=5;
+const $=(s,r)=>(r||document).querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f=x=>{const v=Number(x.toFixed(3));return String(v===0?0:v)};
+const DASH=['','7 4','2 3','9 3 2 3','1 5'];
+const num=v=>{const x=parseFloat(v);return isNaN(x)?0:x};
+const idn=n=>Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?1:0));
+const sleep=()=>{};
+
+/* ---------- Page 1 state ---------- */
+const S1={names:[],rows:[],y1:2000,y2:2020};
+function preset(k){
+  if(k==='four'){S1.names=['Cut','Young','Old-growth'];S1.rows=[[1,0],[2,2],[0,0],[2,0]];S1.y1=1980;S1.y2=1990;}
+  else if(k==='land'){
+    S1.names=['Cut','Young','Early Successional','Mid-Successional','Late Seral'];
+    const C=[[2,11,2,0,0],[1,4,9,1,0],[2,0,7,10,1],[1,0,2,12,10],[1,0,0,1,23]];
+    S1.rows=[];C.forEach((r,i)=>r.forEach((c,j)=>{for(let q=0;q<c;q++)S1.rows.push([i,j]);}));
+    S1.y1=2000;S1.y2=2010;
+  } else {S1.names=['State A','State B','State C'];S1.rows=Array.from({length:6},()=>[-1,-1]);S1.y1=2000;S1.y2=2020;}
+}
+function compute1(){
+  const n=S1.names.length;
+  const counts=Array.from({length:n},()=>Array(n).fill(0));
+  let m=0;
+  S1.rows.forEach(r=>{if(r[0]>=0&&r[1]>=0&&r[0]<n&&r[1]<n){counts[r[0]][r[1]]++;m++;}});
+  const tot=counts.map(r=>r.reduce((a,b)=>a+b,0));
+  const P=counts.map((r,i)=>tot[i]>0?r.map(c=>c/tot[i]):null);
+  const colTot=Array(n).fill(0);counts.forEach(r=>r.forEach((c,j)=>colTot[j]+=c));
+  const xt=tot.map(t=>m?t/m:0), x1=colTot.map(t=>m?t/m:0);
+  return{n,counts,tot,P,xt,x1,m};
+}
+function mat(head,rowsHtml,corner){return `<table class="m"><thead><tr><th class="rl">${corner}</th>${head.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table>`}
+function render1(){
+  const c=compute1(),n=c.n,N=S1.names;
+  $('#h1').textContent=S1.y1;$('#h2').textContent=S1.y2;
+  $('#tally').innerHTML=mat(N,c.counts.map((r,i)=>`<tr><th class="rl">${esc(N[i])}</th>${r.map(v=>`<td class="${v?'':'z'}">${v}</td>`).join('')}</tr>`).join(''),'From (rows)<br>To (columns)');
+  $('#pmat').innerHTML=mat(N,c.P.map((r,i)=>`<tr><th class="rl">${esc(N[i])}</th>${r?r.map(v=>`<td class="${v?'':'z'}">${v.toFixed(3)}</td>`).join(''):`<td class="z" colspan="${n}" style="text-align:center">no points started here</td>`}</tr>`).join(''),'From (rows)<br>To (columns)');
+  const an=annualP(c),yrs=an.yrs;
+  $('#annual').innerHTML=mat(N,an.A.map((q,i)=>`<tr><th class="rl">${esc(N[i])}</th>${c.P[i]?q.map(v=>`<td class="${v?'':'z'}">${v.toFixed(4)}</td>`).join(''):`<td class="z" colspan="${c.n}" style="text-align:center">no points started here</td>`}</tr>`).join(''),'From (rows)<br>To (columns)');
+  $('#annnote').innerHTML=`Method: each off-diagonal probability is divided by the number of years between the two maps, and the diagonal is what is left, so each row sums to 1.`;
+  $('#vecs').innerHTML=`<table class="m"><thead><tr><th class="rl"></th>${N.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>
+    <tr><th class="rl">X<sub>t</sub> (${esc(S1.y1)})</th>${c.xt.map(v=>`<td>${f(v)}</td>`).join('')}</tr>
+    <tr><th class="rl">X<sub>t+1</sub> (${esc(S1.y2)})</th>${c.x1.map(v=>`<td>${f(v)}</td>`).join('')}</tr></tbody></table>`;
+  const warns=[];
+  const empty=c.P.map((r,i)=>r?null:N[i]).filter(Boolean);
+  if(empty.length&&c.m)warns.push(`No point started as ${empty.join(', ')}, so its row of P is unknown. The Project a Model tab will treat it as "stays the same" until you change it.`);
+  const half=S1.rows.filter(r=>(r[0]<0)!==(r[1]<0)).length;
+  if(half)warns.push(`${half} point${half>1?'s have':' has'} only one year filled in and ${half>1?'are':'is'} left out of the counts.`);
+  $('#warn1').innerHTML=warns.map(w=>`<div class="msg">${esc(w)}</div>`).join('');
+  $('#use').disabled=!c.m;
+  if(typeof S2!=='undefined'&&S2.names)loadFromPage1();
+}
+/* Annual matrix: off-diagonals divided by the years between maps; diagonal = 1 minus the rest of the row */
+function annualP(c){
+  const yrs=Math.max(1,Math.round((+S1.y2)-(+S1.y1))||1);
+  const A=c.P.map((r,i)=>{if(!r)return idn(c.n)[i];const q=r.map((v,j)=>j===i?0:v/yrs);q[i]=1-q.reduce((x,y)=>x+y,0);return q;});
+  return {yrs,A};
+}
+function renderNames1(){
+  $('#names1').innerHTML=S1.names.map((n,i)=>`<label for="nm1-${i}">State ${i+1}<input class="nm" id="nm1-${i}" data-i="${i}" value="${esc(n)}"></label>`).join('');
+  $('#n1').value=S1.names.length;$('#y1').value=S1.y1;$('#y2').value=S1.y2;
+}
+function renderRows1(){
+  const opts=sel=>`<option value="-1"${sel<0?' selected':''}>—</option>`+S1.names.map((n,i)=>`<option value="${i}"${sel===i?' selected':''}>${esc(n)}</option>`).join('');
+  $('#rows1').innerHTML=S1.rows.map((r,k)=>`<tr><td>${k+1}</td><td><select data-k="${k}" data-c="0" aria-label="Point ${k+1} in ${esc(S1.y1)}">${opts(r[0])}</select></td><td><select data-k="${k}" data-c="1" aria-label="Point ${k+1} in ${esc(S1.y2)}">${opts(r[1])}</select></td></tr>`).join('');
+}
+function full1(){renderNames1();renderRows1();render1();}
+
+$('#n1').addEventListener('change',e=>{
+  const n=+e.target.value;
+  if(n===3||n===5){preset(n===3?'four':'land');$('#pastemsg').innerHTML='';full1();return;}
+  while(S1.names.length<n)S1.names.push('State '+(S1.names.length+1));
+  S1.names.length=n;
+  S1.rows=S1.rows.map(r=>r.map(v=>v>=n?-1:v));
+  full1();
+});
+$('#names1').addEventListener('change',e=>{
+  const i=+e.target.dataset.i;if(isNaN(i))return;
+  S1.names[i]=e.target.value.trim()||('State '+(i+1));renderNames1();renderRows1();render1();
+});
+$('#y1').addEventListener('input',e=>{S1.y1=num(e.target.value);render1();});
+$('#y2').addEventListener('input',e=>{S1.y2=num(e.target.value);render1();});
+$('#rows1').addEventListener('change',e=>{
+  const k=+e.target.dataset.k,c=+e.target.dataset.c;if(isNaN(k))return;
+  S1.rows[k][c]=+e.target.value;render1();
+});
+$('#addrow').addEventListener('click',()=>{S1.rows.push([-1,-1]);renderRows1();render1();const w=$('.datawrap');w.scrollTop=w.scrollHeight;});
+$('#delrow').addEventListener('click',()=>{S1.rows.pop();renderRows1();render1();});
+$('#resetEx').addEventListener('click',()=>{const n=S1.names.length;if(n===3||n===5){preset(n===3?'four':'land');$('#pastemsg').innerHTML='';full1();}});
+$('#clear1').addEventListener('click',()=>{S1.rows=Array.from({length:6},()=>[-1,-1]);$('#pastemsg').innerHTML='';full1();});
+$('#dopaste').addEventListener('click',()=>{
+  const out=$('#pastemsg');
+  let lines=$('#paste').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){out.innerHTML='<div class="msg">Paste two columns first.</div>';return;}
+  const split=l=>{let t=l.split(/\t|,|;/).map(s=>s.trim()).filter(s=>s!=='');if(t.length<2)t=l.split(/\s{2,}|\s+/).map(s=>s.trim()).filter(Boolean);return t;};
+  let toks=lines.map(split);
+  let y1=S1.y1,y2=S1.y2;
+  if(toks[0].length>=2&&/^\d{4}$/.test(toks[0][0])&&/^\d{4}$/.test(toks[0][1])){y1=+toks[0][0];y2=+toks[0][1];toks.shift();}
+  else if(toks[0].length>=2&&/year/i.test(lines[0])){toks.shift();}
+  const bad=toks.findIndex(t=>t.length<2);
+  if(bad>=0){out.innerHTML=`<div class="msg">Line ${bad+1} needs two values: the state in each year.</div>`;return;}
+  const names=[],key=s=>s.toLowerCase();
+  toks.forEach(t=>[t[0],t[1]].forEach(s=>{if(!names.some(n=>key(n)===key(s)))names.push(s);}));
+  if(names.length>MAXN){out.innerHTML=`<div class="msg">That data has ${names.length} different state names. This tool handles at most ${MAXN}. Merge some classes and paste again.</div>`;return;}
+  if(names.length<2){names.push('Other');}
+  S1.names=names;S1.y1=y1;S1.y2=y2;
+  S1.rows=toks.map(t=>[names.findIndex(n=>key(n)===key(t[0])),names.findIndex(n=>key(n)===key(t[1]))]);
+  out.innerHTML=`<div class="msg info">Loaded ${toks.length} points and ${names.length} states.</div>`;
+  full1();
+});
+async function copyText(text,msgEl){
+  try{await navigator.clipboard.writeText(text);msgEl.innerHTML='<div class="msg info">Copied. Paste it into a spreadsheet.</div>';}
+  catch(e){msgEl.innerHTML=`<div class="msg info">Copying is blocked here. Select and copy this text:</div><textarea readonly>${esc(text)}</textarea>`;}
+}
+
+/* ---------- Page 2 state ---------- */
+const S2={names:[],P:[],x:[],obs:null};
+function loadFromPage1(){
+  const c=compute1();
+  S2.names=S1.names.slice();
+  S2.P=annualP(c).A.map(r=>r.slice());
+  S2.x=c.x1.slice();S2.obs=null;
+  $('#x0year').value=S1.y2;
+  $('#dt').value=1;
+  renderInputs2();
+}
+function renderInputs2(){
+  const n=S2.names.length,N=S2.names;
+  const hd=N.map(s=>`<th>${esc(s)}</th>`).join('');
+  const cell=(id,v,d)=>`<td><input type="number" step="0.01" min="0" id="${id}" value="${d?v.toFixed(d):f(v)}" aria-label="${id}"></td>`;
+  $('#inputs2').innerHTML=`<table class="m"><thead><tr><th class="rl">Initial conditions</th>${hd}<th>Sum</th></tr></thead><tbody>
+    <tr><th class="rl">t = 0 (${esc(S1.y2)})</th>${S2.x.map((v,j)=>cell('x-'+j,v).replace('aria-label="x-'+j+'"',`aria-label="Initial proportion of ${esc(N[j])}"`)).join('')}<td id="xs"></td></tr></tbody></table>
+    <div style="height:14px"></div>
+    <table class="m"><thead><tr><th class="rl">From (rows)<br>To (columns)</th>${hd}<th>Row sum</th></tr></thead><tbody>
+    ${S2.P.map((r,i)=>`<tr><th class="rl">${esc(N[i])}</th>${r.map((v,j)=>cell(`p-${i}-${j}`,v,4).replace(`aria-label="p-${i}-${j}"`,`aria-label="Probability ${esc(N[i])} to ${esc(N[j])}"`)).join('')}<td id="ps-${i}"></td></tr>`).join('')}</tbody></table>
+    `;
+  update2();
+}
+function renderKsteps(){
+  const N=Math.max(1,Math.min(100,Math.round(num($('#N').value))||1));
+  const sel=$('#kstep'),cur=+sel.value||1;
+  sel.innerHTML=Array.from({length:N},(_,i)=>`<option value="${i+1}">Year ${i} → ${i+1}</option>`).join('');
+  sel.value=Math.min(cur,N);
+}
+function project(x,P,N){
+  const out=[x.slice()];
+  for(let k=0;k<N;k++){const p=out[k],q=Array(x.length).fill(0);
+    for(let i=0;i<x.length;i++)for(let j=0;j<x.length;j++)q[j]+=p[i]*P[i][j];out.push(q);}
+  return out;
+}
+function update2(){
+  const n=S2.names.length,N=S2.names;
+  const steps=Math.max(1,Math.min(100,Math.round(num($('#N').value))||1));
+  const y0=num($('#x0year').value),dt=Math.max(1,num($('#dt').value)||1);
+  const sx=S2.x.reduce((a,b)=>a+b,0);
+  const xs=$('#xs');if(xs)xs.innerHTML=`<span class="pill ${Math.abs(sx-1)<.0005?'ok':'bad'}">${f(sx)}</span>`;
+  const warn=[];
+  if(Math.abs(sx-1)>=.0005)warn.push('The initial conditions vector sums to '+f(sx)+', not 1.');
+  S2.P.forEach((r,i)=>{const s=r.reduce((a,b)=>a+b,0);const el=$('#ps-'+i);const ok=Math.abs(s-1)<.0005;
+    if(el)el.innerHTML=`<span class="pill ${ok?'ok':'bad'}">${f(s)}</span>`;
+    if(!ok)warn.push(`Row ${N[i]} of P sums to ${f(s)}, not 1.`);});
+  $('#warn2').innerHTML=warn.map(w=>`<div class="msg">${esc(w)} Edit the numbers so it adds up to 1.</div>`).join('');
+  const out=project(S2.x,S2.P,steps);
+  // legend and stacked area chart
+  const P5=['#B8912F','#D4FA6E','#9ECF63','#4FAE62','#357F20'];
+  const idx={2:[0,4],3:[0,1,4],4:[0,1,3,4],5:[0,1,2,3,4]}[n]||N.map((_,i)=>Math.min(4,i));
+  const colr=i=>P5[idx[i]];
+  $('#legend').innerHTML=N.map((s,i)=>`<span><svg width="14" height="14" aria-hidden="true"><rect width="14" height="14" rx="2" fill="${colr(i)}"/></svg>${esc(s)}</span>`).join('');
+  const box=$('#chart'),W=Math.max(300,Math.round(box.clientWidth||box.parentNode.clientWidth||600)),H=Math.round(Math.max(230,Math.min(340,W*0.55)));
+  const ml=40,mr=10,mt=8,mb=46,pw=W-ml-mr,ph=H-mt-mb;
+  const X=k=>ml+pw*k/steps,Y=v=>mt+ph*(1-Math.max(0,Math.min(1,v)));
+  const maxTicks=W<420?6:9;const every=[1,5,10,20,25,50,100].find(e=>Math.floor(steps/e)+1<=maxTicks)||100;
+  const cum=N.map((_,i)=>out.map(v=>v.slice(0,i+1).reduce((x,y)=>x+y,0)));
+  const bottom=out.map(()=>0);
+  const mono=(xs,ys)=>{const m=xs.length;if(m<3)return {pts:xs.map((x,i)=>[x,ys[i]]),t:null};
+    const d=[],t=Array(m).fill(0);for(let i=0;i<m-1;i++)d.push((ys[i+1]-ys[i])/(xs[i+1]-xs[i]));
+    t[0]=d[0];t[m-1]=d[m-2];for(let i=1;i<m-1;i++)t[i]=d[i-1]*d[i]<=0?0:(d[i-1]+d[i])/2;
+    for(let i=0;i<m-1;i++){if(d[i]===0){t[i]=0;t[i+1]=0;}else{const a=t[i]/d[i],b2=t[i+1]/d[i],h=Math.hypot(a,b2);if(h>3){t[i]=3*a/h*d[i];t[i+1]=3*b2/h*d[i];}}}
+    return {pts:xs.map((x,i)=>[x,ys[i]]),t};};
+  const seg=(xs,ys,rev)=>{const {pts,t}=mono(xs,ys);let p='';const order=rev?[...pts.keys()].reverse():[...pts.keys()];
+    if(!t){order.forEach((i,j)=>{p+=(j?'L':'')+pts[i][0].toFixed(1)+' '+pts[i][1].toFixed(1)+' ';});return p;}
+    if(!rev){for(let i=0;i<pts.length-1;i++){const h=(pts[i+1][0]-pts[i][0])/3;p+=`C${(pts[i][0]+h).toFixed(1)} ${(pts[i][1]+t[i]*h).toFixed(1)} ${(pts[i+1][0]-h).toFixed(1)} ${(pts[i+1][1]-t[i+1]*h).toFixed(1)} ${pts[i+1][0].toFixed(1)} ${pts[i+1][1].toFixed(1)} `;}}
+    else{for(let i=pts.length-1;i>0;i--){const h=(pts[i][0]-pts[i-1][0])/3;p+=`C${(pts[i][0]-h).toFixed(1)} ${(pts[i][1]-t[i]*h).toFixed(1)} ${(pts[i-1][0]+h).toFixed(1)} ${(pts[i-1][1]+t[i-1]*h).toFixed(1)} ${pts[i-1][0].toFixed(1)} ${pts[i-1][1].toFixed(1)} `;}}
+    return p;};
+  const px=out.map((_,k)=>X(k));
+  let g='';
+  N.forEach((s,i)=>{
+    const top=cum[i].map(v=>Y(v)),bot=(i?cum[i-1]:bottom).map(v=>Y(v));
+    const d=`M${px[0].toFixed(1)} ${top[0].toFixed(1)} `+seg(px,top,false)+`L${px[px.length-1].toFixed(1)} ${bot[bot.length-1].toFixed(1)} `+seg(px,bot,true)+'Z';
+    g+=`<path d="${d}" fill="${colr(i)}" stroke="${colr(i)}" stroke-width="0.5"/>`;
+  });
+  [0,.25,.5,.75,1].forEach(v=>{g+=`<text x="${ml-6}" y="${Y(v)+4}" text-anchor="end">${v}</text>`;});
+  g+=`<line x1="${ml}" x2="${W-mr}" y1="${Y(0)}" y2="${Y(0)}" style="stroke:var(--line)" stroke-width="1"/>`;
+  for(let k=0;k<=steps;k+=every){const an=k===0?'start':(k===steps?'end':'middle');g+=`<line x1="${X(k)}" x2="${X(k)}" y1="${Y(0)}" y2="${Y(0)+4}" style="stroke:var(--line)"/><text x="${X(k)}" y="${H-mb+18}" text-anchor="${an}">${f(y0+k*dt)}</text><text x="${X(k)}" y="${H-mb+32}" text-anchor="${an}" style="opacity:.75">t = ${k}</text>`;}
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Stacked area chart of the proportion of each land cover type over time">${g}</svg>`;
+  // table
+  $('#outtab').innerHTML=`<thead><tr><th>t</th><th>Year</th>${N.map(s=>`<th>${esc(s)}</th>`).join('')}<th>Sum</th></tr></thead><tbody>${out.map((v,k)=>`<tr><td>${k}</td><td>${f(y0+k*dt)}</td>${v.map(a=>`<td>${f(a)}</td>`).join('')}<td class="tot">${f(v.reduce((a,b)=>a+b,0))}</td></tr>`).join('')}</tbody>`;
+  // math
+  renderKsteps();
+  const k=+$('#kstep').value||1,prev=out[k-1];
+  $('#math').innerHTML=`<div class="eq">X<sub>${k-1}</sub> = [${prev.map(f).join(', ')}]</div>`+
+    N.map((s,j)=>`<div class="eq"><b>${esc(s)}</b> = ${prev.map((p,i)=>`${f(p)}×${f(S2.P[i][j])}`).join(' + ')} = <b>${f(out[k][j])}</b></div>`).join('');
+}
+$('#inputs2').addEventListener('input',e=>{
+  const id=e.target.id||'';let m;
+  S2.obs=null;
+  if((m=id.match(/^x-(\d+)$/)))S2.x[+m[1]]=num(e.target.value);
+  else if((m=id.match(/^p-(\d+)-(\d+)$/)))S2.P[+m[1]][+m[2]]=num(e.target.value);
+  else return;update2();
+});
+$('#inputs2').addEventListener('click',e=>{
+  S2.obs=null;
+  if(e.target.id==='normx'){const s=S2.x.reduce((a,b)=>a+b,0);if(s>0)S2.x=S2.x.map(v=>v/s);renderInputs2();}
+  if(e.target.id==='normp'){S2.P=S2.P.map((r,i)=>{const s=r.reduce((a,b)=>a+b,0);return s>0?r.map(v=>v/s):idn(r.length)[i];});renderInputs2();}
+});
+const DEF2={
+  5:{names:['Cut','Young','Early Successional','Mid-Successional','Late Seral'],P:[[.15,.70,.15,0,0],[.10,.25,.60,.05,0],[.08,0,.35,.50,.07],[.05,0,.07,.48,.40],[.03,0,0,.05,.92]],x:[.15,.15,.20,.25,.25],y:2000,dt:10,N:10},
+  3:{names:['Cut','Young','Old-growth'],P:[[1,0,0],[1,0,0],[.5,0,.5]],x:[.25,.25,.5],y:1972,dt:19,N:5}
+};
+function setDef2(k){
+  const d=DEF2[k];S2.obs=null;S2.names=d.names.slice();S2.P=d.P.map(r=>r.slice());S2.x=d.x.slice();
+  $('#x0year').value=d.y;$('#dt').value=d.dt;$('#N').value=d.N;renderInputs2();
+}
+['x0year','dt','N','kstep'].forEach(id=>$('#'+id).addEventListener('input',update2));
+$('#copyOut').addEventListener('click',()=>{
+  const steps=Math.max(1,Math.min(100,Math.round(num($('#N').value))||1)),y0=num($('#x0year').value),dt=Math.max(1,num($('#dt').value)||1);
+  const out=project(S2.x,S2.P,steps);
+  copyText(['Step\tYear\t'+S2.names.join('\t')].concat(out.map((v,k)=>k+'\t'+f(y0+k*dt)+'\t'+v.map(f).join('\t'))).join('\n'),$('#copymsg2'));
+});
+$('#use').addEventListener('click',()=>{loadFromPage1();show('project');});
+
+/* ---------- Tabs ---------- */
+function show(which){
+  const b=which==='build';
+  $('#page-build').classList.toggle('hidden',!b);$('#page-project').classList.toggle('hidden',b);
+  $('#tab-build').setAttribute('aria-selected',b);$('#tab-project').setAttribute('aria-selected',!b);
+  try{history.replaceState(null,'','#'+which);}catch(e){}
+  window.scrollTo(0,0);
+  if(!b&&typeof update2==='function'&&S2.names.length)update2();
+}
+let rz=null;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(!$('#page-project').classList.contains('hidden')&&S2.names.length)update2();},150);});
+$('#tab-build').addEventListener('click',()=>show('build'));
+$('#tab-project').addEventListener('click',()=>show('project'));
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(h==='build'||h==='project')show(h);});
+
+preset('land');full1();
+if(location.hash==='#project')show('project');
+</script>
+</body>
+</html>
